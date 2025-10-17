@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
-import {QnAWithBounty} from "../src/core/QnAWithBounty.sol";
+import "../src/core/QnAWithBounty.sol";
 
-contract Deploy is Script {
+contract DeployScript is Script {
     function run() external {
-        uint256 pk = vm.envUint("PRIVATE_KEY");
-        vm.startBroadcast(pk);
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
+        vm.startBroadcast(deployerPrivateKey);
 
-        // Owner can be the deployer EOA or a Safe later
-        QnAWithBounty qna = new QnAWithBounty(vm.addr(pk));
-        console2.log("QnAWithBounty:", address(qna));
+        // Deploy main contract
+        QnAWithBounty qna = new QnAWithBounty(deployer);
 
         vm.stopBroadcast();
+
+        // Log deployed address
+        console.log("Deployer address:", deployer);
+        console.log("QnAWithBounty deployed at:", address(qna));
     }
 }
