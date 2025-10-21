@@ -8,6 +8,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 abstract contract QnAAsk is QnAStorage {
     using SafeERC20 for IERC20;
 
+    // ==================== EVENTS ====================
+
     event QuestionAsked(
         uint256 indexed questionId,
         address indexed asker,
@@ -29,11 +31,22 @@ abstract contract QnAAsk is QnAStorage {
     );
     event QuestionCancelled(uint256 indexed questionId, address indexed by);
 
+    // ==================== MODIFIERS ====================
+
     modifier onlyAsker(uint256 questionId) {
         require(msg.sender == questions[questionId].asker, "Not asker");
         _;
     }
 
+    // ==================== INTERNAL FUNCTIONS ====================
+
+    /**
+     * @notice Internal function to create a new question
+     * @param token Token address (address(0) for native ETH)
+     * @param bounty Bounty amount in wei
+     * @param deadline Unix timestamp when question expires
+     * @param uri IPFS or metadata URI for question content
+     */
     function _askQuestion(
         address token,
         uint256 bounty,
@@ -46,18 +59,23 @@ abstract contract QnAAsk is QnAStorage {
         );
         questionId = ++questionCounter;
 
+        // Handle payment
         if (token == address(0)) {
+            // Native ETH bounty
             require(msg.value == bounty, "Bad msg.value");
         } else {
+            // ERC20 token bounty
             require(msg.value == 0, "No native with ERC20");
-            if (bounty > 0)
+            if (bounty > 0) {
                 IERC20(token).safeTransferFrom(
                     msg.sender,
                     address(this),
                     bounty
                 );
+            }
         }
 
+        // Store question data
         Question storage q = questions[questionId];
         q.asker = msg.sender;
         q.token = token;
@@ -79,12 +97,18 @@ abstract contract QnAAsk is QnAStorage {
         );
     }
 
+    /**
+     * @notice Internal function to add bounty to existing question
+     * @param questionId ID of the question
+     * @param amount Additional bounty amount
+     */
     function _addBounty(uint256 questionId, uint256 amount) internal {
         require(amount > 0, "No amount");
         Question storage q = questions[questionId];
         require(q.status == QuestionStatus.Open, "Not open");
         address token = q.token;
 
+        // Handle payment
         if (token == address(0)) {
             require(msg.value == amount, "Bad msg.value");
         } else {
@@ -96,7 +120,10 @@ abstract contract QnAAsk is QnAStorage {
         emit BountyAdded(questionId, amount, token);
     }
 
-    // 🔹 Added: refund after deadline
+    /**
+     * @notice Internal function to refund bounty after deadline expires
+     * @param questionId ID of the question
+     */
     function _refundExpired(uint256 questionId) internal {
         Question storage q = questions[questionId];
         require(q.status == QuestionStatus.Open, "Not open");
@@ -110,6 +137,7 @@ abstract contract QnAAsk is QnAStorage {
         q.bounty = 0;
         address token = q.token;
 
+        // Refund the bounty
         if (amount > 0) {
             if (token == address(0)) {
                 (bool ok, ) = q.asker.call{value: amount}("");
@@ -121,7 +149,10 @@ abstract contract QnAAsk is QnAStorage {
         }
     }
 
-    // 🔹 Added: cancel before any answer
+    /**
+     * @notice Internal function to cancel question before any answers
+     * @param questionId ID of the question
+     */
     function _cancelQuestion(uint256 questionId) internal {
         Question storage q = questions[questionId];
         require(q.status == QuestionStatus.Open, "Not open");
@@ -133,6 +164,7 @@ abstract contract QnAAsk is QnAStorage {
         q.bounty = 0;
         address token = q.token;
 
+        // Refund the bounty
         if (amount > 0) {
             if (token == address(0)) {
                 (bool ok, ) = q.asker.call{value: amount}("");
