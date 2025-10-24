@@ -211,7 +211,6 @@ abstract contract QnAAsk is QnAStorage {
             }
             emit BountyRefunded(questionId, q.asker, amount, token);
         }
-
         emit QuestionCancelled(questionId, msg.sender);
     }
 }
