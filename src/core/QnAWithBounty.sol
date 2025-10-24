@@ -65,11 +65,28 @@ contract QnAWithBounty is QnAAsk, QnAAnswer, QnAAdmin, ReentrancyGuard {
         _acceptAnswer(questionId, answerId);
     }
 
+    /**
+     * @notice Get the current bounty amount for a question
+     * @param questionId The ID of the question
+     * @return The bounty amount in wei
+     */
+    function bountyOf(uint256 questionId) external view returns (uint256) {
+        require(questionId < questionCounter, "Question does not exist");
+        return questions[questionId].bounty;
+    }
+
     function addBounty(
         uint256 questionId,
         uint256 amount
     ) external payable nonReentrant {
         _addBounty(questionId, amount);
+    }
+
+    function reduceBounty(
+        uint256 questionId,
+        uint256 newAmount
+    ) external nonReentrant onlyAsker(questionId) {
+        _reduceBounty(questionId, newAmount);
     }
 
     // 🔹 Added: externals to match your tests

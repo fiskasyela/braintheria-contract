@@ -29,6 +29,13 @@ abstract contract QnAAsk is QnAStorage {
         uint256 amount,
         address token
     );
+    event BountyReduced(
+        uint256 indexed questionId,
+        address indexed asker,
+        uint256 oldBounty,
+        uint256 newBounty,
+        uint256 refund
+    );
     event QuestionCancelled(uint256 indexed questionId, address indexed by);
 
     // ==================== MODIFIERS ====================
@@ -120,6 +127,35 @@ abstract contract QnAAsk is QnAStorage {
         emit BountyAdded(questionId, amount, token);
     }
 
+    function _reduceBounty(uint256 questionId, uint256 newAmount) internal {
+        Question storage q = questions[questionId];
+        require(q.status == QuestionStatus.Open, "Question not open");
+        require(newAmount < q.bounty, "New bounty must be lower");
+
+        uint256 refund = q.bounty - newAmount;
+        address token = q.token;
+
+        if (token == address(0)) {
+            // refund in native ETH
+            (bool success, ) = payable(msg.sender).call{value: refund}("");
+            require(success, "Refund failed");
+        } else {
+            // refund in ERC20 token
+            IERC20(token).safeTransfer(msg.sender, refund);
+        }
+
+        uint256 oldBounty = q.bounty;
+        q.bounty = newAmount;
+
+        emit BountyReduced(
+            questionId,
+            msg.sender,
+            oldBounty,
+            newAmount,
+            refund
+        );
+    }
+
     /**
      * @notice Internal function to refund bounty after deadline expires
      * @param questionId ID of the question
@@ -150,13 +186,14 @@ abstract contract QnAAsk is QnAStorage {
     }
 
     /**
-     * @notice Internal function to cancel question before any answers
+     * @notice Internal function to cancel question before any accepted answer
      * @param questionId ID of the question
      */
     function _cancelQuestion(uint256 questionId) internal {
         Question storage q = questions[questionId];
+
         require(q.status == QuestionStatus.Open, "Not open");
-        require(q.answersCount == 0, "Already answered");
+        require(q.acceptedAnswerId == 0, "Already accepted");
 
         q.status = QuestionStatus.Cancelled;
 
